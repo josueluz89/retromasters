@@ -24,7 +24,7 @@ const manifest = {
 const builder = new addonBuilder(manifest);
 
 function channelToMeta(ch) {
-  const logo = ch.logo || `${BASE_URL}/logo-default.svg`;
+  const logo = ch.logo || 'https://i.imgur.com/JyvBbs6.png';
   return {
     id: ch.tvgId || ch.name,
     name: ch.name,

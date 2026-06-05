@@ -31,9 +31,10 @@ function parseM3u(content, country) {
       const geoMatch = trimmed.includes('[Geo-blocked]');
       const not24hMatch = trimmed.includes('[Not 24/7]');
 
+      const rawName = nameMatch ? nameMatch[1].trim() : 'Unknown';
       currentMeta = {
         tvgId: tvgIdMatch ? tvgIdMatch[1] : '',
-        name: nameMatch ? nameMatch[1].trim().replace(/\s*\(\d+p.*$/, '').replace(/\s*\[.*\]$/, '').trim() : 'Unknown',
+        name: rawName.replace(/\s*\(\d+(p|i).*$/, '').replace(/\s*\[.*\]$/, '').trim(),
         quality: qualityMatch ? qualityMatch[1] : 'SD',
         geoBlocked: geoMatch,
         not24h: not24hMatch,
