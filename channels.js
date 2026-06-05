@@ -139,7 +139,7 @@ async function fetchAndCache() {
     const coChannels = parseM3u(coResp.data, 'CO');
     const esChannels = parseM3u(esResp.data, 'ES');
     const plChannels = parseM3u(plResp.data, 'PL');
-    const plEsChannels = parseM3u(plEsResp.data, 'ES');
+    const plEsChannels = parseM3u(plEsResp.data, 'PL');
     const plArChannels = parseM3u(plArResp.data, 'PL');
     let all = [...crChannels, ...mxChannels, ...coChannels, ...esChannels, ...plChannels, ...plEsChannels, ...plArChannels];
 
