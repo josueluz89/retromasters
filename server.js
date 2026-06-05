@@ -8,8 +8,8 @@ const BASE_URL = process.env.BASE_URL || `http://localhost:${PORT}`;
 const manifest = {
   id: 'com.masterscr.crmx',
   version: '1.0.0',
-  name: 'Canales CR+MX',
-  description: 'Canales de Costa Rica y México en vivo - iptv-org',
+  name: 'Canales CR+MX+CO',
+  description: 'Canales de Costa Rica, México y Colombia en vivo - iptv-org',
   logo: 'https://i.imgur.com/H89x7GX.png',
   background: 'https://i.imgur.com/H89x7GX.png',
   resources: ['stream', 'catalog', 'meta'],
@@ -17,7 +17,8 @@ const manifest = {
   catalogs: [
     { id: 'crmx_cr', name: 'Costa Rica', type: 'tv' },
     { id: 'crmx_mx', name: 'México', type: 'tv' },
-    { id: 'crmx_all', name: 'CR + MX', type: 'tv' },
+    { id: 'crmx_co', name: 'Colombia', type: 'tv' },
+    { id: 'crmx_all', name: 'Todo', type: 'tv' },
   ],
 };
 
@@ -32,7 +33,7 @@ function channelToMeta(ch) {
     poster: logo,
     posterShape: 'square',
     background: logo,
-    description: `${ch.country === 'CR' ? '🇨🇷' : '🇲🇽'} ${ch.name}${ch.quality ? ` (${ch.quality})` : ''}${ch.geoBlocked ? ' [Geo-blocked]' : ''}${ch.not24h ? ' [Not 24/7]' : ''}`,
+    description: `${ch.country === 'CR' ? '🇨🇷' : ch.country === 'MX' ? '🇲🇽' : '🇨🇴'} ${ch.name}${ch.quality ? ` (${ch.quality})` : ''}${ch.geoBlocked ? ' [Geo-blocked]' : ''}${ch.not24h ? ' [Not 24/7]' : ''}`,
   };
 }
 
@@ -45,6 +46,8 @@ builder.defineCatalogHandler(async (args) => {
       filtered = all.filter(ch => ch.country === 'CR');
     } else if (args.id === 'crmx_mx') {
       filtered = all.filter(ch => ch.country === 'MX');
+    } else if (args.id === 'crmx_co') {
+      filtered = all.filter(ch => ch.country === 'CO');
     } else {
       filtered = all;
     }
@@ -77,7 +80,7 @@ builder.defineStreamHandler(async (args) => {
 
     const stream = {
       url: ch.url,
-      name: `CR+MX · ${ch.name}`,
+      name: `${ch.country === 'CR' ? '🇨🇷' : ch.country === 'MX' ? '🇲🇽' : '🇨🇴'} ${ch.name}`,
     };
 
     if (ch.referrer) {
@@ -94,16 +97,16 @@ builder.defineStreamHandler(async (args) => {
 const app = express();
 app.use(getRouter(builder.getInterface()));
 
-app.get('/health', (req, res) => res.json({ status: 'ok', channels: 'CR+MX', time: new Date().toISOString() }));
+app.get('/health', (req, res) => res.json({ status: 'ok', channels: 'CR+MX+CO', time: new Date().toISOString() }));
 
 channels.init().then(() => {
   app.listen(PORT, () => {
-    console.log(`CR+MX Addon running on port ${PORT}`);
+    console.log(`CR+MX+CO Addon running on port ${PORT}`);
     console.log(`Manifest: ${BASE_URL}/manifest.json`);
   });
 }).catch(e => {
   console.error('Failed to init:', e.message);
   app.listen(PORT, () => {
-    console.log(`CR+MX Addon running (no channels loaded yet) on port ${PORT}`);
+    console.log(`CR+MX+CO Addon running (no channels loaded yet) on port ${PORT}`);
   });
 });
