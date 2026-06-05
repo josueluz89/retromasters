@@ -8,8 +8,8 @@ const BASE_URL = process.env.BASE_URL || `http://localhost:${PORT}`;
 const manifest = {
   id: 'com.masterscr.crmx',
   version: '1.0.0',
-  name: 'Canales CR+MX+CO+ES',
-  description: 'Canales de Costa Rica, México, Colombia y España en vivo - iptv-org',
+  name: 'Canales CR+MX+CO+ES+PL',
+  description: 'Canales de Costa Rica, México, Colombia, España y Pluto TV LATAM en vivo',
   logo: 'https://i.imgur.com/H89x7GX.png',
   background: 'https://i.imgur.com/H89x7GX.png',
   resources: ['stream', 'catalog', 'meta'],
@@ -19,13 +19,14 @@ const manifest = {
     { id: 'crmx_mx', name: 'México', type: 'tv' },
     { id: 'crmx_co', name: 'Colombia', type: 'tv' },
     { id: 'crmx_es', name: 'España', type: 'tv' },
+    { id: 'crmx_pluto', name: 'Pluto TV LATAM', type: 'tv' },
     { id: 'crmx_all', name: 'Todo', type: 'tv' },
   ],
 };
 
 const builder = new addonBuilder(manifest);
 
-const FLAGS = { CR: '🇨🇷', MX: '🇲🇽', CO: '🇨🇴', ES: '🇪🇸' };
+const FLAGS = { CR: '🇨🇷', MX: '🇲🇽', CO: '🇨🇴', ES: '🇪🇸', PL: '📺' };
 
 function channelToMeta(ch) {
   const logo = ch.logo || 'https://i.imgur.com/JyvBbs6.png';
@@ -53,6 +54,8 @@ builder.defineCatalogHandler(async (args) => {
       filtered = all.filter(ch => ch.country === 'CO');
     } else if (args.id === 'crmx_es') {
       filtered = all.filter(ch => ch.country === 'ES');
+    } else if (args.id === 'crmx_pluto') {
+      filtered = all.filter(ch => ch.country === 'PL');
     } else {
       filtered = all;
     }
@@ -102,16 +105,16 @@ builder.defineStreamHandler(async (args) => {
 const app = express();
 app.use(getRouter(builder.getInterface()));
 
-app.get('/health', (req, res) => res.json({ status: 'ok', channels: 'CR+MX+CO', time: new Date().toISOString() }));
+app.get('/health', (req, res) => res.json({ status: 'ok', channels: 'CR+MX+CO+ES+PL', time: new Date().toISOString() }));
 
 channels.init().then(() => {
   app.listen(PORT, () => {
-    console.log(`CR+MX+CO Addon running on port ${PORT}`);
+    console.log(`CR+MX+CO+ES+PL Addon running on port ${PORT}`);
     console.log(`Manifest: ${BASE_URL}/manifest.json`);
   });
 }).catch(e => {
   console.error('Failed to init:', e.message);
   app.listen(PORT, () => {
-    console.log(`CR+MX+CO Addon running (no channels loaded yet) on port ${PORT}`);
+    console.log(`CR+MX+CO+ES+PL Addon running (no channels loaded yet) on port ${PORT}`);
   });
 });

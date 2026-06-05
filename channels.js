@@ -7,6 +7,7 @@ const M3U_URLS = {
   mx: 'https://raw.githubusercontent.com/iptv-org/iptv/master/streams/mx.m3u',
   co: 'https://raw.githubusercontent.com/iptv-org/iptv/master/streams/co.m3u',
   es: 'https://raw.githubusercontent.com/iptv-org/iptv/master/streams/es.m3u',
+  pl: 'https://raw.githubusercontent.com/BuddyChewChew/pluto/main/pluto_mx.m3u',
 };
 const LOGOS_URL = 'https://iptv-org.github.io/api/logos.json';
 const CACHE_FILE = path.join(__dirname, 'cache-channels.json');
@@ -32,6 +33,7 @@ function parseM3u(content, country) {
       const qualityMatch = trimmed.match(/\((\d+p|\d+i)\)/);
       const geoMatch = trimmed.includes('[Geo-blocked]');
       const not24hMatch = trimmed.includes('[Not 24/7]');
+      const logoMatch = trimmed.match(/tvg-logo="([^"]*)"/);
 
       const rawName = nameMatch ? nameMatch[1].trim() : 'Unknown';
       currentMeta = {
@@ -43,6 +45,7 @@ function parseM3u(content, country) {
         country,
         referrer: '',
         url: '',
+        logo: logoMatch ? logoMatch[1] : '',
       };
     } else if (trimmed.startsWith('#EXTVLCOPT:http-referrer=')) {
       currentReferrer = trimmed.split('=').slice(1).join('=');
@@ -119,33 +122,37 @@ function getChannelId(tvgId) {
 
 async function fetchAndCache() {
   try {
-    const [crResp, mxResp, coResp, esResp] = await Promise.all([
+    const [crResp, mxResp, coResp, esResp, plResp] = await Promise.all([
       axios.get(M3U_URLS.cr, { timeout: 20000 }),
       axios.get(M3U_URLS.mx, { timeout: 20000 }),
       axios.get(M3U_URLS.co, { timeout: 20000 }),
       axios.get(M3U_URLS.es, { timeout: 20000 }),
+      axios.get(M3U_URLS.pl, { timeout: 20000 }),
     ]);
 
     const crChannels = parseM3u(crResp.data, 'CR');
     const mxChannels = parseM3u(mxResp.data, 'MX');
     const coChannels = parseM3u(coResp.data, 'CO');
     const esChannels = parseM3u(esResp.data, 'ES');
-    let all = [...crChannels, ...mxChannels, ...coChannels, ...esChannels];
+    const plChannels = parseM3u(plResp.data, 'PL');
+    let all = [...crChannels, ...mxChannels, ...coChannels, ...esChannels, ...plChannels];
 
     all = deduplicate(all);
 
     const logoMap = await fetchLogos();
 
     for (const ch of all) {
-      const channelId = getChannelId(ch.tvgId);
-      ch.logo = logoMap.get(channelId) || '';
+      if (!ch.logo) {
+        const channelId = getChannelId(ch.tvgId);
+        ch.logo = logoMap.get(channelId) || '';
+      }
     }
 
     const data = { channels: all, fetchedAt: Date.now() };
     fs.writeFileSync(CACHE_FILE, JSON.stringify(data, null, 2));
     cachedData = data;
 
-    console.log(`[Channels] Cached ${all.length} channels (${crChannels.length} CR, ${mxChannels.length} MX, ${coChannels.length} CO, ${esChannels.length} ES)`);
+    console.log(`[Channels] Cached ${all.length} channels (${crChannels.length} CR, ${mxChannels.length} MX, ${coChannels.length} CO, ${esChannels.length} ES, ${plChannels.length} PL)`);
     return data;
   } catch (e) {
     console.error('[Channels] Fetch error:', e.message);
