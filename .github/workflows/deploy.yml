@@ -26,4 +26,5 @@ jobs:
             cp -r /tmp/repo/retromasters-master/* . 2>/dev/null || rsync -a /tmp/repo/retromasters-master/ .
             rm -rf /tmp/repo /tmp/repo.zip
             npm install --production
+            rm -f ~/crmx/cache-channels.json
             BASE_URL=https://masterstv.129.213.87.227.sslip.io/crmx pm2 restart crmx --update-env || BASE_URL=https://masterstv.129.213.87.227.sslip.io/crmx pm2 start server.js --name crmx
