@@ -1,0 +1,29 @@
+name: Deploy to VPS
+
+on:
+  push:
+    branches: [master]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: 129.213.87.227
+          username: ubuntu
+          key: ${{ secrets.VM_SSH_KEY }}
+          script: |
+            mkdir -p ~/crmx
+            cd ~/crmx
+            curl -L -o /tmp/repo.zip https://github.com/josueluz89/retromasters/archive/refs/heads/master.zip
+            rm -rf /tmp/repo
+            unzip -o /tmp/repo.zip -d /tmp/repo 2>/dev/null
+            cp -r /tmp/repo/retromasters-master/* . 2>/dev/null || rsync -a /tmp/repo/retromasters-master/ .
+            rm -rf /tmp/repo /tmp/repo.zip
+            npm install --production
+            BASE_URL=https://masterstv.129.213.87.227.sslip.io/crmx pm2 restart crmx --update-env || BASE_URL=https://masterstv.129.213.87.227.sslip.io/crmx pm2 start server.js --name crmx
