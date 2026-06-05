@@ -8,6 +8,8 @@ const M3U_URLS = {
   co: 'https://raw.githubusercontent.com/iptv-org/iptv/master/streams/co.m3u',
   es: 'https://raw.githubusercontent.com/iptv-org/iptv/master/streams/es.m3u',
   pl: 'https://raw.githubusercontent.com/BuddyChewChew/pluto/main/pluto_mx.m3u',
+  pl_es: 'https://raw.githubusercontent.com/BuddyChewChew/pluto/main/pluto_es.m3u',
+  pl_ar: 'https://raw.githubusercontent.com/BuddyChewChew/pluto/main/pluto_ar.m3u',
 };
 const LOGOS_URL = 'https://iptv-org.github.io/api/logos.json';
 const CACHE_FILE = path.join(__dirname, 'cache-channels.json');
@@ -122,12 +124,14 @@ function getChannelId(tvgId) {
 
 async function fetchAndCache() {
   try {
-    const [crResp, mxResp, coResp, esResp, plResp] = await Promise.all([
+    const [crResp, mxResp, coResp, esResp, plResp, plEsResp, plArResp] = await Promise.all([
       axios.get(M3U_URLS.cr, { timeout: 20000 }),
       axios.get(M3U_URLS.mx, { timeout: 20000 }),
       axios.get(M3U_URLS.co, { timeout: 20000 }),
       axios.get(M3U_URLS.es, { timeout: 20000 }),
       axios.get(M3U_URLS.pl, { timeout: 20000 }),
+      axios.get(M3U_URLS.pl_es, { timeout: 20000 }),
+      axios.get(M3U_URLS.pl_ar, { timeout: 20000 }),
     ]);
 
     const crChannels = parseM3u(crResp.data, 'CR');
@@ -135,7 +139,9 @@ async function fetchAndCache() {
     const coChannels = parseM3u(coResp.data, 'CO');
     const esChannels = parseM3u(esResp.data, 'ES');
     const plChannels = parseM3u(plResp.data, 'PL');
-    let all = [...crChannels, ...mxChannels, ...coChannels, ...esChannels, ...plChannels];
+    const plEsChannels = parseM3u(plEsResp.data, 'ES');
+    const plArChannels = parseM3u(plArResp.data, 'PL');
+    let all = [...crChannels, ...mxChannels, ...coChannels, ...esChannels, ...plChannels, ...plEsChannels, ...plArChannels];
 
     all = deduplicate(all);
 
@@ -152,7 +158,7 @@ async function fetchAndCache() {
     fs.writeFileSync(CACHE_FILE, JSON.stringify(data, null, 2));
     cachedData = data;
 
-    console.log(`[Channels] Cached ${all.length} channels (${crChannels.length} CR, ${mxChannels.length} MX, ${coChannels.length} CO, ${esChannels.length} ES, ${plChannels.length} PL)`);
+    console.log(`[Channels] Cached ${all.length} channels (${crChannels.length} CR, ${mxChannels.length} MX, ${coChannels.length} CO, ${esChannels.length} ES, ${plChannels.length} PL, ${plEsChannels.length} PL_ES, ${plArChannels.length} PL_AR)`);
     return data;
   } catch (e) {
     console.error('[Channels] Fetch error:', e.message);
