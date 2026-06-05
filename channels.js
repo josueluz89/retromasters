@@ -6,6 +6,7 @@ const M3U_URLS = {
   cr: 'https://raw.githubusercontent.com/iptv-org/iptv/master/streams/cr.m3u',
   mx: 'https://raw.githubusercontent.com/iptv-org/iptv/master/streams/mx.m3u',
   co: 'https://raw.githubusercontent.com/iptv-org/iptv/master/streams/co.m3u',
+  es: 'https://raw.githubusercontent.com/iptv-org/iptv/master/streams/es.m3u',
 };
 const LOGOS_URL = 'https://iptv-org.github.io/api/logos.json';
 const CACHE_FILE = path.join(__dirname, 'cache-channels.json');
@@ -118,16 +119,18 @@ function getChannelId(tvgId) {
 
 async function fetchAndCache() {
   try {
-    const [crResp, mxResp, coResp] = await Promise.all([
+    const [crResp, mxResp, coResp, esResp] = await Promise.all([
       axios.get(M3U_URLS.cr, { timeout: 20000 }),
       axios.get(M3U_URLS.mx, { timeout: 20000 }),
       axios.get(M3U_URLS.co, { timeout: 20000 }),
+      axios.get(M3U_URLS.es, { timeout: 20000 }),
     ]);
 
     const crChannels = parseM3u(crResp.data, 'CR');
     const mxChannels = parseM3u(mxResp.data, 'MX');
     const coChannels = parseM3u(coResp.data, 'CO');
-    let all = [...crChannels, ...mxChannels, ...coChannels];
+    const esChannels = parseM3u(esResp.data, 'ES');
+    let all = [...crChannels, ...mxChannels, ...coChannels, ...esChannels];
 
     all = deduplicate(all);
 
@@ -142,7 +145,7 @@ async function fetchAndCache() {
     fs.writeFileSync(CACHE_FILE, JSON.stringify(data, null, 2));
     cachedData = data;
 
-    console.log(`[Channels] Cached ${all.length} channels (${crChannels.length} CR, ${mxChannels.length} MX, ${coChannels.length} CO)`);
+    console.log(`[Channels] Cached ${all.length} channels (${crChannels.length} CR, ${mxChannels.length} MX, ${coChannels.length} CO, ${esChannels.length} ES)`);
     return data;
   } catch (e) {
     console.error('[Channels] Fetch error:', e.message);
