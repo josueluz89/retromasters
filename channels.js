@@ -7,9 +7,9 @@ const M3U_URLS = {
   mx: 'https://raw.githubusercontent.com/iptv-org/iptv/master/streams/mx.m3u',
   co: 'https://raw.githubusercontent.com/iptv-org/iptv/master/streams/co.m3u',
   es: 'https://raw.githubusercontent.com/iptv-org/iptv/master/streams/es.m3u',
-  pl: 'https://raw.githubusercontent.com/BuddyChewChew/pluto/main/pluto_mx.m3u',
-  pl_es: 'https://raw.githubusercontent.com/BuddyChewChew/pluto/main/pluto_es.m3u',
-  pl_ar: 'https://raw.githubusercontent.com/BuddyChewChew/pluto/main/pluto_ar.m3u',
+  pl: 'https://raw.githubusercontent.com/BuddyChewChew/app-m3u-generator/refs/heads/main/playlists/plutotv_mx.m3u',
+  pl_es: 'https://raw.githubusercontent.com/BuddyChewChew/app-m3u-generator/refs/heads/main/playlists/plutotv_es.m3u',
+  pl_ar: 'https://raw.githubusercontent.com/BuddyChewChew/app-m3u-generator/refs/heads/main/playlists/plutotv_ar.m3u',
 };
 const LOGOS_URL = 'https://iptv-org.github.io/api/logos.json';
 const CACHE_FILE = path.join(__dirname, 'cache-channels.json');
