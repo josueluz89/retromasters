@@ -141,6 +141,9 @@ async function fetchAndCache() {
     const plChannels = parseM3u(plResp.data, 'PL');
     const plEsChannels = parseM3u(plEsResp.data, 'PL');
     const plArChannels = parseM3u(plArResp.data, 'PL');
+    for (const ch of plChannels) { if (ch.tvgId) ch.tvgId = `pluto_${ch.tvgId}`; }
+    for (const ch of plEsChannels) { if (ch.tvgId) ch.tvgId = `pluto_${ch.tvgId}`; }
+    for (const ch of plArChannels) { if (ch.tvgId) ch.tvgId = `pluto_${ch.tvgId}`; }
     let all = [...crChannels, ...mxChannels, ...coChannels, ...esChannels, ...plChannels, ...plEsChannels, ...plArChannels];
 
     all = deduplicate(all);
