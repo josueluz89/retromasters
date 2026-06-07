@@ -9,7 +9,7 @@ const M3U_URLS = {
   pl: 'https://raw.githubusercontent.com/BuddyChewChew/app-m3u-generator/refs/heads/main/playlists/plutotv_mx.m3u',
   pl_es: 'https://raw.githubusercontent.com/BuddyChewChew/app-m3u-generator/refs/heads/main/playlists/plutotv_es.m3u',
   pl_ar: 'https://raw.githubusercontent.com/BuddyChewChew/app-m3u-generator/refs/heads/main/playlists/plutotv_ar.m3u',
-  vix: 'https://raw.githubusercontent.com/carlosal37/iptv-vix/main/vix.m3u',
+  plex: 'https://raw.githubusercontent.com/BuddyChewChew/app-m3u-generator/refs/heads/main/playlists/plex_all.m3u',
 };
 const LOGOS_URL = 'https://iptv-org.github.io/api/logos.json';
 const CACHE_FILE = path.join(__dirname, 'cache-channels.json');
@@ -128,13 +128,6 @@ function getChannelId(tvgId) {
 
 async function fetchPlaylist(key, url) {
   try {
-    if (key === 'vix') {
-      const localPath = path.join(__dirname, 'vix.m3u');
-      if (fs.existsSync(localPath)) {
-        console.log('[Channels] Loading local vix.m3u playlist file');
-        return fs.readFileSync(localPath, 'utf8');
-      }
-    }
     const resp = await axios.get(url, { timeout: 20000 });
     return resp.data;
   } catch (e) {
@@ -161,12 +154,42 @@ async function fetchAndCache() {
     const plChannels = parseM3u(playlistData.pl, 'PL');
     const plEsChannels = parseM3u(playlistData.pl_es, 'PL');
     const plArChannels = parseM3u(playlistData.pl_ar, 'PL');
-    const vixChannels = parseM3u(playlistData.vix, 'VIX');
+    let plexChannels = parseM3u(playlistData.plex, 'PLEX');
+    plexChannels = plexChannels.filter(ch => {
+      const name = ch.name.toLowerCase();
+      const group = (ch.group || '').toLowerCase();
+      if (group === 'mexico' || group === 'spain') {
+        const englishExclusions = [
+          'usa today', 'nfl channel', 'weatherspy', 'wired2fish', 'women\'s sports network',
+          'the design network', 'startalk tv', 'court tv', 'pac-12 insider', 'pga tour', 
+          'poker night tv', 'rocket wars', 'strongman', 'unbeaten', 'wpt', 'world poker tour',
+          'wired2fish', 'nhra tv', 'people are awesome', 'motorvision', 'magellantv', 'masha and the bear',
+          'made in hollywood', 'love nature', 'hollywood', 'ftf', 'edm', 'design network', 'championship',
+          'boat show', 'beano', 'baby shark', 'beernews', 'bloomberg', 'classica', 'fashion', 'gamer',
+          'gpx', 'intrigue', 'inwild', 'inwonder', 'life down under', 'lone star', 'monster jam', 'more u',
+          'mr. bean', 'mutant x', 'mythical', 'newsmax2', 'newsworld', 'nolly africa', 'nosey',
+          'operation repo', 'pocket.watch', 'qello', 'qwest', 'racer', 'racing america', 'remember the',
+          'ryan and friends', 'smooth jazz', 'smurf', 'sonic', 'speedvision', 'ted', 'tennis', 'tg junior',
+          'the blacklist', 'the pet collective', 'the wiggles', 'toon goggles', 'trace uk', 'trace urban',
+          'trailers from hell', 'true history', 'weather', 'wildearth', 'wineman', 'yahoo', 'yu-gi-oh', 'z nation'
+        ];
+        if (englishExclusions.some(ex => name.includes(ex))) {
+          return false;
+        }
+        return true;
+      }
+      const explicitSpanish = [
+        'español', 'espanol', 'latino', 'latina', 'telemundo', 
+        'univision', 'estrella', 'canela', 'butaca', 'caracol', 
+        'rcn', 'azteca'
+      ];
+      return explicitSpanish.some(keyword => name.includes(keyword));
+    });
 
     for (const ch of plChannels) { if (ch.tvgId) ch.tvgId = `pluto_${ch.tvgId}`; }
     for (const ch of plEsChannels) { if (ch.tvgId) ch.tvgId = `pluto_${ch.tvgId}`; }
     for (const ch of plArChannels) { if (ch.tvgId) ch.tvgId = `pluto_${ch.tvgId}`; }
-    for (const ch of vixChannels) { if (ch.tvgId) ch.tvgId = `vix_${ch.tvgId}`; }
+    for (const ch of plexChannels) { if (ch.tvgId) ch.tvgId = `plex_${ch.tvgId}`; }
 
     let all = [
       ...crChannels,
@@ -175,7 +198,7 @@ async function fetchAndCache() {
       ...plChannels,
       ...plEsChannels,
       ...plArChannels,
-      ...vixChannels
+      ...plexChannels
     ];
 
     all = deduplicate(all);
@@ -193,7 +216,7 @@ async function fetchAndCache() {
     fs.writeFileSync(CACHE_FILE, JSON.stringify(data, null, 2));
     cachedData = data;
 
-    console.log(`[Channels] Cached ${all.length} channels (${crChannels.length} CR, ${coChannels.length} CO, ${esChannels.length} ES, ${plChannels.length + plEsChannels.length + plArChannels.length} Pluto, ${vixChannels.length} ViX)`);
+    console.log(`[Channels] Cached ${all.length} channels (${crChannels.length} CR, ${coChannels.length} CO, ${esChannels.length} ES, ${plChannels.length + plEsChannels.length + plArChannels.length} Pluto, ${plexChannels.length} Plex)`);
     return data;
   } catch (e) {
     console.error('[Channels] Fetch error:', e.message);
