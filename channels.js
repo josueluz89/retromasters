@@ -38,6 +38,7 @@ function parseM3u(content, country) {
       const geoMatch = trimmed.includes('[Geo-blocked]');
       const not24hMatch = trimmed.includes('[Not 24/7]');
       const logoMatch = trimmed.match(/tvg-logo="([^"]*)"/);
+      const groupMatch = trimmed.match(/group-title="([^"]*)"/);
 
       const rawName = nameMatch ? nameMatch[1].trim() : 'Unknown';
       currentMeta = {
@@ -47,6 +48,7 @@ function parseM3u(content, country) {
         geoBlocked: geoMatch,
         not24h: not24hMatch,
         country,
+        group: groupMatch ? groupMatch[1] : '',
         referrer: '',
         url: '',
         logo: logoMatch ? logoMatch[1] : '',
@@ -159,7 +161,38 @@ async function fetchAndCache() {
     const plChannels = parseM3u(playlistData.pl, 'PL');
     const plEsChannels = parseM3u(playlistData.pl_es, 'PL');
     const plArChannels = parseM3u(playlistData.pl_ar, 'PL');
-    const plexChannels = parseM3u(playlistData.plex, 'PLEX');
+    let plexChannels = parseM3u(playlistData.plex, 'PLEX');
+    plexChannels = plexChannels.filter(ch => {
+      const name = ch.name.toLowerCase();
+      const group = (ch.group || '').toLowerCase();
+      if (group === 'mexico' || group === 'spain') {
+        const englishExclusions = [
+          'usa today', 'nfl channel', 'weatherspy', 'wired2fish', 'women\'s sports network',
+          'the design network', 'startalk tv', 'court tv', 'pac-12 insider', 'pga tour', 
+          'poker night tv', 'rocket wars', 'strongman', 'unbeaten', 'wpt', 'world poker tour',
+          'wired2fish', 'nhra tv', 'people are awesome', 'motorvision', 'magellantv', 'masha and the bear',
+          'made in hollywood', 'love nature', 'hollywood', 'ftf', 'edm', 'design network', 'championship',
+          'boat show', 'beano', 'baby shark', 'beernews', 'bloomberg', 'classica', 'fashion', 'gamer',
+          'gpx', 'intrigue', 'inwild', 'inwonder', 'life down under', 'lone star', 'monster jam', 'more u',
+          'mr. bean', 'mutant x', 'mythical', 'newsmax2', 'newsworld', 'nolly africa', 'nosey',
+          'operation repo', 'pocket.watch', 'qello', 'qwest', 'racer', 'racing america', 'remember the',
+          'ryan and friends', 'smooth jazz', 'smurf', 'sonic', 'speedvision', 'ted', 'tennis', 'tg junior',
+          'the blacklist', 'the pet collective', 'the wiggles', 'toon goggles', 'trace uk', 'trace urban',
+          'trailers from hell', 'true history', 'weather', 'wildearth', 'wineman', 'yahoo', 'yu-gi-oh', 'z nation'
+        ];
+        if (englishExclusions.some(ex => name.includes(ex))) {
+          return false;
+        }
+        return true;
+      }
+      const explicitSpanish = [
+        'español', 'espanol', 'latino', 'latina', 'telemundo', 
+        'univision', 'estrella', 'canela', 'butaca', 'caracol', 
+        'rcn', 'azteca'
+      ];
+      return explicitSpanish.some(keyword => name.includes(keyword));
+    });
+
     const vixChannels = parseM3u(playlistData.vix, 'VIX');
 
     for (const ch of plChannels) { if (ch.tvgId) ch.tvgId = `pluto_${ch.tvgId}`; }
