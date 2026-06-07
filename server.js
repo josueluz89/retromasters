@@ -1,6 +1,8 @@
 const express = require('express');
 const { addonBuilder, getRouter } = require('stremio-addon-sdk');
 const channels = require('./channels');
+const xtream = require('./xtream');
+
 
 const PORT = process.env.PORT || 3001;
 const BASE_URL = process.env.BASE_URL || `http://localhost:${PORT}`;
@@ -84,18 +86,33 @@ builder.defineStreamHandler(async (args) => {
   try {
     const all = await channels.getChannels();
     const ch = all.find(c => (c.tvgId || c.name) === args.id);
-    if (!ch || !ch.url) return { streams: [] };
+    if (!ch) return { streams: [] };
 
-    const stream = {
-      url: ch.url,
-      name: `${FLAGS[ch.country] || '📺'} ${ch.name}`,
-    };
+    const streams = [];
 
-    if (ch.referrer) {
-      stream.behaviorHints = { proxyHeaders: { request: { Referer: ch.referrer } } };
+    // Opción 1: Stream público estándar
+    if (ch.url) {
+      const stream = {
+        url: ch.url,
+        name: `${FLAGS[ch.country] || '📺'} ${ch.name}`,
+      };
+
+      if (ch.referrer) {
+        stream.behaviorHints = { proxyHeaders: { request: { Referer: ch.referrer } } };
+      }
+      streams.push(stream);
     }
 
-    return { streams: [stream] };
+    // Opción 2: Rotador Xtream Premium (si hay portales activos)
+    const activePortals = xtream.getPortals().filter(p => p.isVerifiedOnline);
+    if (activePortals.length > 0) {
+      streams.push({
+        url: `${BASE_URL}/stream-redirect?name=${encodeURIComponent(ch.name)}`,
+        name: `🔗 Xtream Premium (Rotativo) | ${ch.name}`,
+      });
+    }
+
+    return { streams };
   } catch (e) {
     console.error('[Stream] Error:', e.message);
     return { streams: [] };
@@ -105,15 +122,53 @@ builder.defineStreamHandler(async (args) => {
 const app = express();
 app.use(getRouter(builder.getInterface()));
 
+// Redireccionador de streams para balanceo de carga
+app.get('/stream-redirect', (req, res) => {
+  const channelName = req.query.name;
+  if (!channelName) {
+    return res.status(400).send('Missing channel name');
+  }
+  const streamInfo = xtream.allocateStreamByName(channelName);
+  if (streamInfo) {
+    xtream.setupAutoRelease(streamInfo.portalIndex);
+    return res.redirect(302, streamInfo.streamUrl);
+  } else {
+    return res.status(404).send('No active Xtream portals found with this channel or connection limit reached.');
+  }
+});
+
 app.get('/health', (req, res) => res.json({ status: 'ok', channels: 'CR+CO+ES+PL+PLEX', time: new Date().toISOString() }));
 
-channels.init().then(() => {
+channels.init().then(async () => {
+  await xtream.verifyAllPortals();
+  
+  // Si no hay portales activos después de cargar, correr el scraper de inmediato
+  const activePortals = xtream.getPortals().filter(p => p.isVerifiedOnline);
+  if (activePortals.length === 0) {
+    console.log('[Server] No active portals found. Running scraper automatically on startup...');
+    const { runScraper } = require('./scraper');
+    runScraper().catch(e => console.error('[Server] Startup scrape failed:', e.message));
+  }
+
+  // Correr el scraper cada 12 horas en segundo plano
+  setInterval(() => {
+    console.log('[Server] Running scheduled scraper...');
+    const { runScraper } = require('./scraper');
+    runScraper().catch(e => console.error('[Server] Scheduled scrape failed:', e.message));
+  }, 12 * 60 * 60 * 1000);
+
   app.listen(PORT, () => {
     console.log(`CR+CO+ES+PL+PLEX Addon running on port ${PORT}`);
     console.log(`Manifest: ${BASE_URL}/manifest.json`);
   });
-}).catch(e => {
-  console.error('Failed to init:', e.message);
+}).catch(async (e) => {
+  console.error('Failed to init channels:', e.message);
+  await xtream.verifyAllPortals().catch(err => console.error('Failed to init portals:', err.message));
+  
+  // Correr scraper en caso de fallo en inicialización también
+  const { runScraper } = require('./scraper');
+  runScraper().catch(err => console.error('[Server] Fallback startup scrape failed:', err.message));
+
   app.listen(PORT, () => {
     console.log(`CR+CO+ES+PL+PLEX Addon running (no channels loaded yet) on port ${PORT}`);
   });
