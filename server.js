@@ -7,7 +7,7 @@ const BASE_URL = process.env.BASE_URL || `http://localhost:${PORT}`;
 
 const manifest = {
   id: 'com.masterscr.crmx',
-  version: '1.0.0',
+  version: '1.1.0',
   name: 'Canales CR+CO+ES+PL',
   description: 'Canales de Costa Rica, Colombia, España, Pluto TV LATAM, ViX Gratis y Plex TV en vivo',
   logo: 'https://i.imgur.com/H89x7GX.png',
