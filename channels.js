@@ -9,6 +9,8 @@ const M3U_URLS = {
   pl: 'https://raw.githubusercontent.com/BuddyChewChew/app-m3u-generator/refs/heads/main/playlists/plutotv_mx.m3u',
   pl_es: 'https://raw.githubusercontent.com/BuddyChewChew/app-m3u-generator/refs/heads/main/playlists/plutotv_es.m3u',
   pl_ar: 'https://raw.githubusercontent.com/BuddyChewChew/app-m3u-generator/refs/heads/main/playlists/plutotv_ar.m3u',
+  plex: 'https://raw.githubusercontent.com/BuddyChewChew/app-m3u-generator/refs/heads/main/playlists/plex_all.m3u',
+  vix: 'https://raw.githubusercontent.com/carlosal37/iptv-vix/main/vix.m3u',
 };
 const LOGOS_URL = 'https://iptv-org.github.io/api/logos.json';
 const CACHE_FILE = path.join(__dirname, 'cache-channels.json');
@@ -19,6 +21,7 @@ const QUALITY_RANK = { '2160p': 5, '1080p': 4, '1080i': 3, '720p': 2, '576p': 1,
 let cachedData = null;
 
 function parseM3u(content, country) {
+  if (!content) return [];
   const lines = content.split('\n');
   const channels = [];
   let currentMeta = null;
@@ -121,27 +124,60 @@ function getChannelId(tvgId) {
   return tvgId.replace(/@\w+$/, '');
 }
 
+async function fetchPlaylist(key, url) {
+  try {
+    if (key === 'vix') {
+      const localPath = path.join(__dirname, 'vix.m3u');
+      if (fs.existsSync(localPath)) {
+        console.log('[Channels] Loading local vix.m3u playlist file');
+        return fs.readFileSync(localPath, 'utf8');
+      }
+    }
+    const resp = await axios.get(url, { timeout: 20000 });
+    return resp.data;
+  } catch (e) {
+    console.error(`[Channels] Failed to fetch playlist ${key}:`, e.message);
+    return null;
+  }
+}
+
 async function fetchAndCache() {
   try {
-    const [crResp, coResp, esResp, plResp, plEsResp, plArResp] = await Promise.all([
-      axios.get(M3U_URLS.cr, { timeout: 20000 }),
-      axios.get(M3U_URLS.co, { timeout: 20000 }),
-      axios.get(M3U_URLS.es, { timeout: 20000 }),
-      axios.get(M3U_URLS.pl, { timeout: 20000 }),
-      axios.get(M3U_URLS.pl_es, { timeout: 20000 }),
-      axios.get(M3U_URLS.pl_ar, { timeout: 20000 }),
-    ]);
+    const keys = Object.keys(M3U_URLS);
+    const results = await Promise.all(
+      keys.map(key => fetchPlaylist(key, M3U_URLS[key]))
+    );
 
-    const crChannels = parseM3u(crResp.data, 'CR');
-    const coChannels = parseM3u(coResp.data, 'CO');
-    const esChannels = parseM3u(esResp.data, 'ES');
-    const plChannels = parseM3u(plResp.data, 'PL');
-    const plEsChannels = parseM3u(plEsResp.data, 'PL');
-    const plArChannels = parseM3u(plArResp.data, 'PL');
+    const playlistData = {};
+    keys.forEach((key, index) => {
+      playlistData[key] = results[index] || '';
+    });
+
+    const crChannels = parseM3u(playlistData.cr, 'CR');
+    const coChannels = parseM3u(playlistData.co, 'CO');
+    const esChannels = parseM3u(playlistData.es, 'ES');
+    const plChannels = parseM3u(playlistData.pl, 'PL');
+    const plEsChannels = parseM3u(playlistData.pl_es, 'PL');
+    const plArChannels = parseM3u(playlistData.pl_ar, 'PL');
+    const plexChannels = parseM3u(playlistData.plex, 'PLEX');
+    const vixChannels = parseM3u(playlistData.vix, 'VIX');
+
     for (const ch of plChannels) { if (ch.tvgId) ch.tvgId = `pluto_${ch.tvgId}`; }
     for (const ch of plEsChannels) { if (ch.tvgId) ch.tvgId = `pluto_${ch.tvgId}`; }
     for (const ch of plArChannels) { if (ch.tvgId) ch.tvgId = `pluto_${ch.tvgId}`; }
-    let all = [...crChannels, ...coChannels, ...esChannels, ...plChannels, ...plEsChannels, ...plArChannels];
+    for (const ch of plexChannels) { if (ch.tvgId) ch.tvgId = `plex_${ch.tvgId}`; }
+    for (const ch of vixChannels) { if (ch.tvgId) ch.tvgId = `vix_${ch.tvgId}`; }
+
+    let all = [
+      ...crChannels,
+      ...coChannels,
+      ...esChannels,
+      ...plChannels,
+      ...plEsChannels,
+      ...plArChannels,
+      ...plexChannels,
+      ...vixChannels
+    ];
 
     all = deduplicate(all);
 
@@ -158,7 +194,7 @@ async function fetchAndCache() {
     fs.writeFileSync(CACHE_FILE, JSON.stringify(data, null, 2));
     cachedData = data;
 
-    console.log(`[Channels] Cached ${all.length} channels (${crChannels.length} CR, ${coChannels.length} CO, ${esChannels.length} ES, ${plChannels.length} PL, ${plEsChannels.length} PL_ES, ${plArChannels.length} PL_AR)`);
+    console.log(`[Channels] Cached ${all.length} channels (${crChannels.length} CR, ${coChannels.length} CO, ${esChannels.length} ES, ${plChannels.length + plEsChannels.length + plArChannels.length} Pluto, ${plexChannels.length} Plex, ${vixChannels.length} ViX)`);
     return data;
   } catch (e) {
     console.error('[Channels] Fetch error:', e.message);
