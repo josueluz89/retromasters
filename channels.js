@@ -78,7 +78,8 @@ function deduplicate(channels) {
 
   for (const ch of channels) {
     if (!ch.url) continue;
-    const key = ch.tvgId || ch.name;
+    const isPlexOrPluto = ch.country === 'PLEX' || ch.country === 'PL';
+    const key = isPlexOrPluto ? ch.name.toLowerCase() : (ch.tvgId || ch.name);
     if (!key) continue;
 
     const existing = best.get(key);
