@@ -140,16 +140,31 @@ app.get('/health', (req, res) => res.json({ status: 'ok', channels: 'CR+CO+ES+PL
 
 app.use(getRouter(builder.getInterface()));
 
-channels.init().then(async () => {
-  await xtream.verifyAllPortals();
-  
-  // Si no hay portales activos después de cargar, correr el scraper de inmediato
-  const activePortals = xtream.getPortals().filter(p => p.isVerifiedOnline);
-  if (activePortals.length === 0) {
-    console.log('[Server] No active portals found. Running scraper automatically on startup...');
+// Iniciar el servidor escuchando en el puerto de inmediato para evitar que el VPS falle por timeout
+app.listen(PORT, () => {
+  console.log(`CR+CO+ES+PL+PLEX Addon running on port ${PORT}`);
+  console.log(`Manifest: ${BASE_URL}/manifest.json`);
+
+  // Inicialización en segundo plano de canales y portales Xtream
+  channels.init().then(async () => {
+    console.log('[Server] Channels successfully cached. Verifying portals...');
+    await xtream.verifyAllPortals();
+    
+    // Si no hay portales activos después de cargar, correr el scraper de inmediato
+    const activePortals = xtream.getPortals().filter(p => p.isVerifiedOnline);
+    if (activePortals.length === 0) {
+      console.log('[Server] No active portals found. Running scraper automatically...');
+      const { runScraper } = require('./scraper');
+      runScraper().catch(e => console.error('[Server] Startup scrape failed:', e.message));
+    }
+  }).catch(async (e) => {
+    console.error('[Server] Failed to init channels:', e.message);
+    await xtream.verifyAllPortals().catch(err => console.error('[Server] Failed to init portals:', err.message));
+    
+    // Correr scraper en caso de fallo en inicialización también
     const { runScraper } = require('./scraper');
-    runScraper().catch(e => console.error('[Server] Startup scrape failed:', e.message));
-  }
+    runScraper().catch(err => console.error('[Server] Fallback startup scrape failed:', err.message));
+  });
 
   // Correr el scraper cada 12 horas en segundo plano
   setInterval(() => {
@@ -157,20 +172,4 @@ channels.init().then(async () => {
     const { runScraper } = require('./scraper');
     runScraper().catch(e => console.error('[Server] Scheduled scrape failed:', e.message));
   }, 12 * 60 * 60 * 1000);
-
-  app.listen(PORT, () => {
-    console.log(`CR+CO+ES+PL+PLEX Addon running on port ${PORT}`);
-    console.log(`Manifest: ${BASE_URL}/manifest.json`);
-  });
-}).catch(async (e) => {
-  console.error('Failed to init channels:', e.message);
-  await xtream.verifyAllPortals().catch(err => console.error('Failed to init portals:', err.message));
-  
-  // Correr scraper en caso de fallo en inicialización también
-  const { runScraper } = require('./scraper');
-  runScraper().catch(err => console.error('[Server] Fallback startup scrape failed:', err.message));
-
-  app.listen(PORT, () => {
-    console.log(`CR+CO+ES+PL+PLEX Addon running (no channels loaded yet) on port ${PORT}`);
-  });
 });
