@@ -1,8 +1,6 @@
 const express = require('express');
 const { addonBuilder, getRouter } = require('stremio-addon-sdk');
 const channels = require('./channels');
-const xtream = require('./xtream');
-
 
 const PORT = process.env.PORT || 3001;
 const BASE_URL = process.env.BASE_URL || `http://localhost:${PORT}`;
@@ -22,21 +20,18 @@ const manifest = {
     { id: 'crmx_es', name: 'España', type: 'tv' },
     { id: 'crmx_pluto', name: 'Pluto TV LATAM', type: 'tv' },
     { id: 'crmx_plex', name: 'Plex TV', type: 'tv' },
-    { id: 'crmx_xtream_cine', name: 'Premium: Cine & Series', type: 'tv' },
-    { id: 'crmx_xtream_cultura', name: 'Premium: Cultura', type: 'tv' },
-    { id: 'crmx_xtream_eventos', name: 'Premium: Eventos & Deportes', type: 'tv' },
     { id: 'crmx_all', name: 'Todo', type: 'tv' },
   ],
 };
 
 const builder = new addonBuilder(manifest);
 
-const FLAGS = { CR: '🇨🇷', CO: '🇨🇴', ES: '🇪🇸', PL: '📺', PLEX: '🎥', XTREAM: '🔗' };
+const FLAGS = { CR: '🇨🇷', CO: '🇨🇴', ES: '🇪🇸', PL: '📺', PLEX: '🎥' };
 
 function channelToMeta(ch) {
   const logo = ch.logo || 'https://i.imgur.com/JyvBbs6.png';
   return {
-    id: ch.id || ch.tvgId || ch.name,
+    id: ch.tvgId || ch.name,
     name: ch.name,
     type: 'tv',
     poster: logo,
@@ -61,19 +56,8 @@ builder.defineCatalogHandler(async (args) => {
       filtered = all.filter(ch => ch.country === 'PL');
     } else if (args.id === 'crmx_plex') {
       filtered = all.filter(ch => ch.country === 'PLEX');
-    } else if (args.id === 'crmx_xtream_cine') {
-      filtered = xtream.getSpanishChannels('cine');
-    } else if (args.id === 'crmx_xtream_cultura') {
-      filtered = xtream.getSpanishChannels('cultura');
-    } else if (args.id === 'crmx_xtream_eventos') {
-      filtered = xtream.getSpanishChannels('eventos');
     } else {
-      filtered = [
-        ...all,
-        ...xtream.getSpanishChannels('cine'),
-        ...xtream.getSpanishChannels('cultura'),
-        ...xtream.getSpanishChannels('eventos')
-      ];
+      filtered = all;
     }
 
     const metas = filtered.map(channelToMeta);
@@ -86,16 +70,6 @@ builder.defineCatalogHandler(async (args) => {
 
 builder.defineMetaHandler(async (args) => {
   try {
-    if (args.id && args.id.startsWith('xtream_')) {
-      const list = [
-        ...xtream.getSpanishChannels('cine'),
-        ...xtream.getSpanishChannels('cultura'),
-        ...xtream.getSpanishChannels('eventos')
-      ];
-      const ch = list.find(c => c.id === args.id);
-      if (!ch) return { meta: {} };
-      return { meta: channelToMeta(ch) };
-    }
     const all = await channels.getChannels();
     const ch = all.find(c => (c.tvgId || c.name) === args.id);
     if (!ch) return { meta: {} };
@@ -108,53 +82,20 @@ builder.defineMetaHandler(async (args) => {
 
 builder.defineStreamHandler(async (args) => {
   try {
-    if (args.id && args.id.startsWith('xtream_')) {
-      const list = [
-        ...xtream.getSpanishChannels('cine'),
-        ...xtream.getSpanishChannels('cultura'),
-        ...xtream.getSpanishChannels('eventos')
-      ];
-      const ch = list.find(c => c.id === args.id);
-      if (!ch) return { streams: [] };
-      return {
-        streams: [
-          {
-            url: `${BASE_URL}/stream-redirect?name=${encodeURIComponent(ch.name)}`,
-            name: `🔗 Xtream Premium (Rotativo) | ${ch.name}`,
-          }
-        ]
-      };
-    }
-
     const all = await channels.getChannels();
     const ch = all.find(c => (c.tvgId || c.name) === args.id);
-    if (!ch) return { streams: [] };
+    if (!ch || !ch.url) return { streams: [] };
 
-    const streams = [];
+    const stream = {
+      url: ch.url,
+      name: `${FLAGS[ch.country] || '📺'} ${ch.name}`,
+    };
 
-    // Opción 1: Stream público estándar
-    if (ch.url) {
-      const stream = {
-        url: ch.url,
-        name: `${FLAGS[ch.country] || '📺'} ${ch.name}`,
-      };
-
-      if (ch.referrer) {
-        stream.behaviorHints = { proxyHeaders: { request: { Referer: ch.referrer } } };
-      }
-      streams.push(stream);
+    if (ch.referrer) {
+      stream.behaviorHints = { proxyHeaders: { request: { Referer: ch.referrer } } };
     }
 
-    // Opción 2: Rotador Xtream Premium (si hay portales activos)
-    const activePortals = xtream.getPortals().filter(p => p.isVerifiedOnline);
-    if (activePortals.length > 0) {
-      streams.push({
-        url: `${BASE_URL}/stream-redirect?name=${encodeURIComponent(ch.name)}`,
-        name: `🔗 Xtream Premium (Rotativo) | ${ch.name}`,
-      });
-    }
-
-    return { streams };
+    return { streams: [stream] };
   } catch (e) {
     console.error('[Stream] Error:', e.message);
     return { streams: [] };
@@ -162,56 +103,18 @@ builder.defineStreamHandler(async (args) => {
 });
 
 const app = express();
-
-// Redireccionador de streams para balanceo de carga
-app.get('/stream-redirect', (req, res) => {
-  const channelName = req.query.name;
-  if (!channelName) {
-    return res.status(400).send('Missing channel name');
-  }
-  const streamInfo = xtream.allocateStreamByName(channelName);
-  if (streamInfo) {
-    xtream.setupAutoRelease(streamInfo.portalIndex);
-    return res.redirect(302, streamInfo.streamUrl);
-  } else {
-    return res.status(404).send('No active Xtream portals found with this channel or connection limit reached.');
-  }
-});
+app.use(getRouter(builder.getInterface()));
 
 app.get('/health', (req, res) => res.json({ status: 'ok', channels: 'CR+CO+ES+PL+PLEX', time: new Date().toISOString() }));
 
-app.use(getRouter(builder.getInterface()));
-
-// Iniciar el servidor escuchando en el puerto de inmediato para evitar que el VPS falle por timeout
-app.listen(PORT, () => {
-  console.log(`CR+CO+ES+PL+PLEX Addon running on port ${PORT}`);
-  console.log(`Manifest: ${BASE_URL}/manifest.json`);
-
-  // Inicialización en segundo plano de canales y portales Xtream
-  channels.init().then(async () => {
-    console.log('[Server] Channels successfully cached. Verifying portals...');
-    await xtream.verifyAllPortals();
-    
-    // Si no hay portales activos después de cargar, correr el scraper de inmediato
-    const activePortals = xtream.getPortals().filter(p => p.isVerifiedOnline);
-    if (activePortals.length === 0) {
-      console.log('[Server] No active portals found. Running scraper automatically...');
-      const { runScraper } = require('./scraper');
-      runScraper().catch(e => console.error('[Server] Startup scrape failed:', e.message));
-    }
-  }).catch(async (e) => {
-    console.error('[Server] Failed to init channels:', e.message);
-    await xtream.verifyAllPortals().catch(err => console.error('[Server] Failed to init portals:', err.message));
-    
-    // Correr scraper en caso de fallo en inicialización también
-    const { runScraper } = require('./scraper');
-    runScraper().catch(err => console.error('[Server] Fallback startup scrape failed:', err.message));
+channels.init().then(() => {
+  app.listen(PORT, () => {
+    console.log(`CR+CO+ES+PL+PLEX Addon running on port ${PORT}`);
+    console.log(`Manifest: ${BASE_URL}/manifest.json`);
   });
-
-  // Correr el scraper cada 12 horas en segundo plano
-  setInterval(() => {
-    console.log('[Server] Running scheduled scraper...');
-    const { runScraper } = require('./scraper');
-    runScraper().catch(e => console.error('[Server] Scheduled scrape failed:', e.message));
-  }, 12 * 60 * 60 * 1000);
+}).catch(e => {
+  console.error('Failed to init:', e.message);
+  app.listen(PORT, () => {
+    console.log(`CR+CO+ES+PL+PLEX Addon running (no channels loaded yet) on port ${PORT}`);
+  });
 });
