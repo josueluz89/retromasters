@@ -22,7 +22,9 @@ const manifest = {
     { id: 'crmx_es', name: 'España', type: 'tv' },
     { id: 'crmx_pluto', name: 'Pluto TV LATAM', type: 'tv' },
     { id: 'crmx_plex', name: 'Plex TV', type: 'tv' },
-    { id: 'crmx_xtream', name: 'IPTV Premium', type: 'tv' },
+    { id: 'crmx_xtream_cine', name: 'Premium: Cine & Series', type: 'tv' },
+    { id: 'crmx_xtream_cultura', name: 'Premium: Cultura', type: 'tv' },
+    { id: 'crmx_xtream_eventos', name: 'Premium: Eventos & Deportes', type: 'tv' },
     { id: 'crmx_all', name: 'Todo', type: 'tv' },
   ],
 };
@@ -59,10 +61,19 @@ builder.defineCatalogHandler(async (args) => {
       filtered = all.filter(ch => ch.country === 'PL');
     } else if (args.id === 'crmx_plex') {
       filtered = all.filter(ch => ch.country === 'PLEX');
-    } else if (args.id === 'crmx_xtream') {
-      filtered = xtream.getSpanishChannels();
+    } else if (args.id === 'crmx_xtream_cine') {
+      filtered = xtream.getSpanishChannels('cine');
+    } else if (args.id === 'crmx_xtream_cultura') {
+      filtered = xtream.getSpanishChannels('cultura');
+    } else if (args.id === 'crmx_xtream_eventos') {
+      filtered = xtream.getSpanishChannels('eventos');
     } else {
-      filtered = [...all, ...xtream.getSpanishChannels()];
+      filtered = [
+        ...all,
+        ...xtream.getSpanishChannels('cine'),
+        ...xtream.getSpanishChannels('cultura'),
+        ...xtream.getSpanishChannels('eventos')
+      ];
     }
 
     const metas = filtered.map(channelToMeta);
@@ -76,7 +87,11 @@ builder.defineCatalogHandler(async (args) => {
 builder.defineMetaHandler(async (args) => {
   try {
     if (args.id && args.id.startsWith('xtream_')) {
-      const list = xtream.getSpanishChannels();
+      const list = [
+        ...xtream.getSpanishChannels('cine'),
+        ...xtream.getSpanishChannels('cultura'),
+        ...xtream.getSpanishChannels('eventos')
+      ];
       const ch = list.find(c => c.id === args.id);
       if (!ch) return { meta: {} };
       return { meta: channelToMeta(ch) };
@@ -94,7 +109,11 @@ builder.defineMetaHandler(async (args) => {
 builder.defineStreamHandler(async (args) => {
   try {
     if (args.id && args.id.startsWith('xtream_')) {
-      const list = xtream.getSpanishChannels();
+      const list = [
+        ...xtream.getSpanishChannels('cine'),
+        ...xtream.getSpanishChannels('cultura'),
+        ...xtream.getSpanishChannels('eventos')
+      ];
       const ch = list.find(c => c.id === args.id);
       if (!ch) return { streams: [] };
       return {

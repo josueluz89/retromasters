@@ -58,6 +58,15 @@ function isSpanish(channelName, categoryName) {
   const cn = channelName.toLowerCase();
   const cat = categoryName.toLowerCase();
 
+  // If it's a global sports or PPV category, allow it (but filter out foreign languages below)
+  if (cat.includes('ppv') || cat.includes('ufc') || cat.includes('champions') || cat.includes('laliga') || cat.includes('dazn') || cat.includes('sportv') || cat.includes('esportes') || cat.includes('f1') || cat.includes('formula') || cat.includes('nfl') || cat.includes('mlb') || cat.includes('nba') || cat.includes('nhl')) {
+    const foreignLangs = ['fr |', 'de |', 'pl |', 'nl |', 'it |', 'pt |', 'tr |', 'uk |', 'us |', 'arab', 'asia', 'eu |', 'exyu'];
+    if (foreignLangs.some(lang => cat.includes(lang))) {
+      return false;
+    }
+    return true;
+  }
+
   // Explicit Spanish indicators in name
   if (cn.includes('español') || cn.includes('espanol') || cn.includes('latino') || cn.includes('spain') || cn.includes('latam')) {
     return true;
@@ -221,9 +230,13 @@ function allocateStreamByName(channelName) {
   return null;
 }
 
-// Unify, deduplicate, and sort all Spanish channels found in verified portals
-function getSpanishChannels() {
+// Unify, deduplicate, and sort Spanish channels by theme type ('cine', 'cultura', 'eventos')
+function getSpanishChannels(type) {
   const merged = new Map();
+  
+  const CINE_KEYWORDS = ['cine', 'pelicul', 'movie network', 'hbo', 'telecine', 'tele cine', 'latino vip', 'cinema vip', 'filmski', 'cine bit', 'cinema et series'];
+  const CULTURA_KEYWORDS = ['cultura', 'document', 'culture', 'discovery', 'geographic', 'history'];
+  const EVENTOS_KEYWORDS = ['event', 'ppv', 'ufc', 'laliga', 'champions', 'deportes', 'directv sports', 'dazn', 'toros', 'sportv', 'esportes', 'f1', 'formula', 'nfl', 'mlb', 'nba', 'nhl'];
 
   for (let i = 0; i < portals.length; i++) {
     const portal = portals[i];
@@ -234,7 +247,21 @@ function getSpanishChannels() {
       const name = ch.name.trim();
       if (!name) continue;
 
-      const key = name.toLowerCase();
+      const catName = (ch.category_name || '').toLowerCase();
+      const chName = name.toLowerCase();
+      
+      let matches = false;
+      if (type === 'cine') {
+        matches = CINE_KEYWORDS.some(kw => catName.includes(kw) || chName.includes('hbo') || chName.includes('cinecanal') || chName.includes('star channel'));
+      } else if (type === 'cultura') {
+        matches = CULTURA_KEYWORDS.some(kw => catName.includes(kw) || chName.includes('discovery') || chName.includes('geographic') || chName.includes('natgeo') || chName.includes('history channel'));
+      } else if (type === 'eventos') {
+        matches = EVENTOS_KEYWORDS.some(kw => catName.includes(kw) || chName.includes('laliga') || chName.includes('champions') || chName.includes('dazn') || chName.includes('ufc') || chName.includes('ppv'));
+      }
+
+      if (!matches) continue;
+
+      const key = chName;
       // Keep channel if new or if existing logo is empty and this one has a logo
       if (!merged.has(key)) {
         merged.set(key, {
