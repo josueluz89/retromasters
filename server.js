@@ -120,7 +120,6 @@ builder.defineStreamHandler(async (args) => {
 });
 
 const app = express();
-app.use(getRouter(builder.getInterface()));
 
 // Redireccionador de streams para balanceo de carga
 app.get('/stream-redirect', (req, res) => {
@@ -138,6 +137,8 @@ app.get('/stream-redirect', (req, res) => {
 });
 
 app.get('/health', (req, res) => res.json({ status: 'ok', channels: 'CR+CO+ES+PL+PLEX', time: new Date().toISOString() }));
+
+app.use(getRouter(builder.getInterface()));
 
 channels.init().then(async () => {
   await xtream.verifyAllPortals();
