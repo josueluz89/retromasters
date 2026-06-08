@@ -22,18 +22,19 @@ const manifest = {
     { id: 'crmx_es', name: 'España', type: 'tv' },
     { id: 'crmx_pluto', name: 'Pluto TV LATAM', type: 'tv' },
     { id: 'crmx_plex', name: 'Plex TV', type: 'tv' },
+    { id: 'crmx_xtream', name: 'IPTV Premium', type: 'tv' },
     { id: 'crmx_all', name: 'Todo', type: 'tv' },
   ],
 };
 
 const builder = new addonBuilder(manifest);
 
-const FLAGS = { CR: '🇨🇷', CO: '🇨🇴', ES: '🇪🇸', PL: '📺', PLEX: '🎥' };
+const FLAGS = { CR: '🇨🇷', CO: '🇨🇴', ES: '🇪🇸', PL: '📺', PLEX: '🎥', XTREAM: '🔗' };
 
 function channelToMeta(ch) {
   const logo = ch.logo || 'https://i.imgur.com/JyvBbs6.png';
   return {
-    id: ch.tvgId || ch.name,
+    id: ch.id || ch.tvgId || ch.name,
     name: ch.name,
     type: 'tv',
     poster: logo,
@@ -58,8 +59,10 @@ builder.defineCatalogHandler(async (args) => {
       filtered = all.filter(ch => ch.country === 'PL');
     } else if (args.id === 'crmx_plex') {
       filtered = all.filter(ch => ch.country === 'PLEX');
+    } else if (args.id === 'crmx_xtream') {
+      filtered = xtream.getSpanishChannels();
     } else {
-      filtered = all;
+      filtered = [...all, ...xtream.getSpanishChannels()];
     }
 
     const metas = filtered.map(channelToMeta);
@@ -72,6 +75,12 @@ builder.defineCatalogHandler(async (args) => {
 
 builder.defineMetaHandler(async (args) => {
   try {
+    if (args.id && args.id.startsWith('xtream_')) {
+      const list = xtream.getSpanishChannels();
+      const ch = list.find(c => c.id === args.id);
+      if (!ch) return { meta: {} };
+      return { meta: channelToMeta(ch) };
+    }
     const all = await channels.getChannels();
     const ch = all.find(c => (c.tvgId || c.name) === args.id);
     if (!ch) return { meta: {} };
@@ -84,6 +93,20 @@ builder.defineMetaHandler(async (args) => {
 
 builder.defineStreamHandler(async (args) => {
   try {
+    if (args.id && args.id.startsWith('xtream_')) {
+      const list = xtream.getSpanishChannels();
+      const ch = list.find(c => c.id === args.id);
+      if (!ch) return { streams: [] };
+      return {
+        streams: [
+          {
+            url: `${BASE_URL}/stream-redirect?name=${encodeURIComponent(ch.name)}`,
+            name: `🔗 Xtream Premium (Rotativo) | ${ch.name}`,
+          }
+        ]
+      };
+    }
+
     const all = await channels.getChannels();
     const ch = all.find(c => (c.tvgId || c.name) === args.id);
     if (!ch) return { streams: [] };

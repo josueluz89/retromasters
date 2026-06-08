@@ -47,6 +47,42 @@ function savePortals() {
   }
 }
 
+const SPANISH_KEYWORDS = [
+  'esp', 'spa', 'lat', 'mex', 'col', 'arg', 'chi', 'ecu', 'per', 'ven', 'uru', 
+  'par', 'bol', 'cri', 'costa', 'dominic', 'panam', 'hondur', 'nicar', 'salvad',
+  'spain', 'latino', 'latam', 'mexico', 'colombia', 'argentina', 'hispano', 'castellano',
+  'sur', 'telemundo', 'univision', 'directv', 'movistar', 'caracol', 'rcn', 'azteca'
+];
+
+function isSpanish(channelName, categoryName) {
+  const cn = channelName.toLowerCase();
+  const cat = categoryName.toLowerCase();
+
+  // Explicit Spanish indicators in name
+  if (cn.includes('español') || cn.includes('espanol') || cn.includes('latino') || cn.includes('spain') || cn.includes('latam')) {
+    return true;
+  }
+
+  // Country tags in brackets or prefixes (e.g. [ES], ES:, SP:, [LAT], etc.)
+  if (/\b(es|esp|sp|lat|latam|mex|col|arg|cl|cri|cr|co|ar)\b/i.test(cn)) {
+    if (!cn.includes('espn') && !cn.includes('test')) {
+      return true;
+    }
+  }
+
+  // Check category name
+  if (SPANISH_KEYWORDS.some(kw => cat.includes(kw))) {
+    // Exclude English/foreign if category says UK/US/FR/DE/etc.
+    const foreignKeywords = ['usa', 'us:', 'uk:', 'united kingdom', 'english', 'french', 'italy', 'germany', 'deutch', 'arabic', 'turk'];
+    if (foreignKeywords.some(fkw => cat.includes(fkw) || cn.includes(fkw))) {
+      return false;
+    }
+    return true;
+  }
+
+  return false;
+}
+
 // Verify a single portal and cache its channels
 async function verifyPortal(portal, index) {
   if (!portal.active) return false;
@@ -60,18 +96,42 @@ async function verifyPortal(portal, index) {
       return false;
     }
 
+    // Get categories first to map category_id -> category_name
+    let categoriesMap = {};
+    try {
+      const catsUrl = `${url}&action=get_live_categories`;
+      const catsResp = await axios.get(catsUrl, { timeout: 10000 });
+      if (Array.isArray(catsResp.data)) {
+        catsResp.data.forEach(cat => {
+          categoriesMap[cat.category_id] = cat.category_name || '';
+        });
+      }
+    } catch (err) {
+      console.log(`[Xtream] Portal ${index} categories fetch failed, falling back to name-only filtering.`);
+    }
+
     // Get live streams
     const streamsUrl = `${url}&action=get_live_streams`;
     const streamsResp = await axios.get(streamsUrl, { timeout: 15000 });
     
     if (Array.isArray(streamsResp.data)) {
-      portalChannelsCache[index] = streamsResp.data.map(ch => ({
-        stream_id: ch.stream_id,
-        name: (ch.name || '').trim(),
-        category_id: ch.category_id,
-        stream_type: ch.stream_type
-      }));
-      console.log(`[Xtream] Portal ${index} (${portal.host}) active with ${streamsResp.data.length} channels.`);
+      const filteredSpanish = [];
+      streamsResp.data.forEach(ch => {
+        const catName = categoriesMap[ch.category_id] || '';
+        const name = (ch.name || '').trim();
+        if (isSpanish(name, catName)) {
+          filteredSpanish.push({
+            stream_id: ch.stream_id,
+            name: name.replace(/\s*\[.*?\]/g, '').replace(/\s*\(.*?\)/g, '').trim(), // Clean bracket tags
+            category_id: ch.category_id,
+            category_name: catName,
+            logo: ch.stream_icon || ''
+          });
+        }
+      });
+
+      portalChannelsCache[index] = filteredSpanish;
+      console.log(`[Xtream] Portal ${index} (${portal.host}) active with ${filteredSpanish.length} Spanish channels.`);
       return true;
     } else {
       console.log(`[Xtream] Portal ${index} (${portal.host}) auth succeeded but returned no stream array.`);
@@ -161,6 +221,38 @@ function allocateStreamByName(channelName) {
   return null;
 }
 
+// Unify, deduplicate, and sort all Spanish channels found in verified portals
+function getSpanishChannels() {
+  const merged = new Map();
+
+  for (let i = 0; i < portals.length; i++) {
+    const portal = portals[i];
+    if (!portal.isVerifiedOnline || !portal.active) continue;
+
+    const list = portalChannelsCache[i] || [];
+    for (const ch of list) {
+      const name = ch.name.trim();
+      if (!name) continue;
+
+      const key = name.toLowerCase();
+      // Keep channel if new or if existing logo is empty and this one has a logo
+      if (!merged.has(key)) {
+        merged.set(key, {
+          id: `xtream_${encodeURIComponent(name)}`,
+          name: name,
+          logo: ch.logo || '',
+          country: 'XTREAM'
+        });
+      } else if (ch.logo && !merged.get(key).logo) {
+        merged.get(key).logo = ch.logo;
+      }
+    }
+  }
+
+  // Sort alphabetically by name
+  return Array.from(merged.values()).sort((a, b) => a.name.localeCompare(b.name));
+}
+
 // Auto-release connections after a certain timeout (since player doesn't send close event in Stremio)
 // Default to 3 hours
 function setupAutoRelease(portalIndex, durationMs = 3 * 60 * 60 * 1000) {
@@ -178,6 +270,7 @@ module.exports = {
   getPortals,
   getPortalChannels,
   allocateStreamByName,
+  getSpanishChannels, // Added for new catalog
   setupAutoRelease,
   portalChannelsCache // Exposed for testing/mocking
 };
