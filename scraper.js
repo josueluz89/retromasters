@@ -177,10 +177,32 @@ async function scrapeGithub() {
 }
 
 // Test a candidate credential
+// Function to test if a specific stream is working and returning video/audio data
+async function testStreamPlayback(host, username, password, streamId) {
+  const streamUrl = `${host}/live/${username}/${password}/${streamId}.ts`;
+  try {
+    const resp = await axios.get(streamUrl, {
+      timeout: 5000,
+      headers: { 'User-Agent': 'Mozilla/5.0' },
+      responseType: 'stream'
+    });
+    
+    if (resp.status >= 200 && resp.status < 400) {
+      // Stream is active! Destroy connection immediately to save bandwidth
+      resp.data.destroy();
+      return true;
+    }
+  } catch (err) {
+    // Fail silently
+  }
+  return false;
+}
+
+// Test a candidate credential
 async function verifyCandidate(c) {
   const url = `${c.host}/player_api.php?username=${encodeURIComponent(c.username)}&password=${encodeURIComponent(c.password)}`;
   try {
-    // Use direct call to verify candidate
+    // 1. Verify auth and credentials
     const resp = await axios.get(url, { timeout: 6000 });
     if (resp.data && resp.data.user_info) {
       const info = resp.data.user_info;
@@ -191,14 +213,35 @@ async function verifyCandidate(c) {
       // Ensure account is active and not expired
       const isNotExpired = !expDate || (expDate * 1000 > Date.now());
       if (status === 'active' && isNotExpired) {
-        return {
-          host: c.host,
-          username: c.username,
-          password: c.password,
-          connectionsLimit: isNaN(maxConns) || maxConns <= 0 ? 1 : maxConns,
-          activeConnections: 0,
-          active: true
-        };
+        
+        // FILTER: Only keep portals supporting multiple connections (>= 2) to ensure stability
+        if (maxConns < 2) {
+          return null; // Skip single connection accounts
+        }
+
+        // 2. Fetch streams to pick a test channel
+        const streamsUrl = `${url}&action=get_live_streams`;
+        const streamsResp = await axios.get(streamsUrl, { timeout: 8000 });
+        
+        if (Array.isArray(streamsResp.data) && streamsResp.data.length > 0) {
+          // Pick the first available stream to test
+          const sampleStreamId = streamsResp.data[0].stream_id;
+          
+          // 3. Test if the stream is actually playable (delivers video data)
+          const isPlayable = await testStreamPlayback(c.host, c.username, c.password, sampleStreamId);
+          if (isPlayable) {
+            return {
+              host: c.host,
+              username: c.username,
+              password: c.password,
+              connectionsLimit: isNaN(maxConns) || maxConns <= 0 ? 1 : maxConns,
+              activeConnections: 0,
+              active: true
+            };
+          } else {
+            console.log(`[Scraper] [DISCARDED] ${c.host} (${c.username}) - Auth succeeded but video stream failed playback test.`);
+          }
+        }
       }
     }
   } catch (e) {
