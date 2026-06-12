@@ -20,9 +20,9 @@ jobs:
           script: |
             cd ~/crmx
             git init -q
-            git remote add origin https://github.com/josueluz89/retromasters.git 2>/dev/null || git remote set-url origin https://github.com/josueluz89/retromasters.git
+            git remote add origin https://github.com/josueluz89/canales-crmx-addon.git 2>/dev/null || git remote set-url origin https://github.com/josueluz89/canales-crmx-addon.git
             git fetch origin master
             git reset --hard origin/master
             npm install --production
-            rm -f cache-channels.json
-            BASE_URL=https://masterstv.129.213.87.227.sslip.io/crmx pm2 restart crmx --update-env || BASE_URL=https://masterstv.129.213.87.227.sslip.io/crmx pm2 start server.js --name crmx
+            export BASE_URL=https://masterstv.129.213.87.227.sslip.io/crmx
+            pm2 restart crmx --update-env 2>/dev/null || pm2 start server.js --name crmx --update-env

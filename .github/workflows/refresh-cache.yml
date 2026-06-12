@@ -1,0 +1,33 @@
+name: Refresh Cache
+
+on:
+  schedule:
+    - cron: '0 */6 * * *'
+  workflow_dispatch:
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install dependencies
+        run: npm install --production
+
+      - name: Generate cache
+        run: node refresh-cache.js
+
+      - name: Upload cache to VPS
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: 129.213.87.227
+          username: ubuntu
+          key: ${{ secrets.VM_SSH_KEY }}
+          source: cache-channels.json
+          target: ~/crmx
+          strip_components: 0

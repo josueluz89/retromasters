@@ -4,7 +4,6 @@ const path = require('path');
 
 const M3U_URLS = {
   cr: 'https://raw.githubusercontent.com/iptv-org/iptv/master/streams/cr.m3u',
-  co: 'https://raw.githubusercontent.com/iptv-org/iptv/master/streams/co.m3u',
   es: 'https://raw.githubusercontent.com/iptv-org/iptv/master/streams/es.m3u',
   pl: 'https://raw.githubusercontent.com/BuddyChewChew/app-m3u-generator/refs/heads/main/playlists/plutotv_mx.m3u',
   pl_es: 'https://raw.githubusercontent.com/BuddyChewChew/app-m3u-generator/refs/heads/main/playlists/plutotv_es.m3u',
@@ -149,7 +148,6 @@ async function fetchAndCache() {
     });
 
     const crChannels = parseM3u(playlistData.cr, 'CR');
-    const coChannels = parseM3u(playlistData.co, 'CO');
     const esChannels = parseM3u(playlistData.es, 'ES');
     const plChannels = parseM3u(playlistData.pl, 'PL');
     const plEsChannels = parseM3u(playlistData.pl_es, 'PL');
@@ -193,7 +191,6 @@ async function fetchAndCache() {
 
     let all = [
       ...crChannels,
-      ...coChannels,
       ...esChannels,
       ...plChannels,
       ...plEsChannels,
@@ -216,7 +213,7 @@ async function fetchAndCache() {
     fs.writeFileSync(CACHE_FILE, JSON.stringify(data, null, 2));
     cachedData = data;
 
-    console.log(`[Channels] Cached ${all.length} channels (${crChannels.length} CR, ${coChannels.length} CO, ${esChannels.length} ES, ${plChannels.length + plEsChannels.length + plArChannels.length} Pluto, ${plexChannels.length} Plex)`);
+    console.log(`[Channels] Cached ${all.length} channels (${crChannels.length} CR, ${esChannels.length} ES, ${plChannels.length + plEsChannels.length + plArChannels.length} Pluto, ${plexChannels.length} Plex)`);
     return data;
   } catch (e) {
     console.error('[Channels] Fetch error:', e.message);
@@ -257,4 +254,4 @@ async function init() {
   }
 }
 
-module.exports = { getChannels, init };
+module.exports = { getChannels, init, fetchAndCache };
