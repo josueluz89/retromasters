@@ -28,9 +28,7 @@ const builder = new addonBuilder(manifest);
 const FLAGS = { CR: '🇨🇷', ES: '🇪🇸', PL: '📺', PLEX: '🎥' };
 
 function channelToMeta(ch) {
-  const logo = ch.logo
-    ? `https://images.weserv.nl/?url=${encodeURIComponent(ch.logo)}&w=460&output=webp`
-    : 'https://i.imgur.com/JyvBbs6.png';
+  const logo = ch.logo || 'https://i.imgur.com/JyvBbs6.png';
   return {
     id: ch.tvgId || ch.name,
     name: ch.name,
