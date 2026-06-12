@@ -20,7 +20,7 @@ jobs:
           script: |
             cd ~/crmx
             git init -q
-            git remote add origin https://github.com/josueluz89/canales-crmx-addon.git 2>/dev/null || git remote set-url origin https://github.com/josueluz89/canales-crmx-addon.git
+            git remote add origin https://github.com/josueluz89/retromasters.git 2>/dev/null || git remote set-url origin https://github.com/josueluz89/retromasters.git
             git fetch origin master
             git reset --hard origin/master
             npm install --production
